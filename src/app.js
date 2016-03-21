@@ -6,7 +6,7 @@ var _ = require("lodash");
 var BACKGROUND_COLOR = "white";
 var TEXT_COLOR = "black";
 
-var FORECAST_API_KEY = "";
+var FORECAST_API_KEY = "dd2b6b8d146f64405c03fa35dab04885";
 var LOCATION = "35.9333,-79.0333";
 
 function get_and_cache(key, duration, fn, cb) {
@@ -28,18 +28,23 @@ function get_and_cache(key, duration, fn, cb) {
     console.log("Value not cached");
     update_value();
   } else {
-    var stored = JSON.parse(storedJSON);
-  
-    // Set if unset / expired
-    if(
-      !stored.hasOwnProperty("timestamp") ||
-      stored.timestamp + duration <= Date.now()
-    ) {
-      console.log("Invalid/expired cached value");
+    try {
+      var stored = JSON.parse(storedJSON);
+
+      // Set if unset / expired
+      if(
+        !stored.hasOwnProperty("timestamp") ||
+        stored.timestamp + duration <= Date.now()
+      ) {
+        console.log("Invalid/expired cached value");
+        update_value();
+      } else {
+        console.log("Reading cached value for " + key);
+        cb(stored.value);
+      }
+    } catch(ex) {
+      console.log("Invalid JSON stored in localStorage");
       update_value();
-    } else {
-      console.log("Reading cached value for " + key);
-      cb(stored.value);
     }
   }
 }
@@ -88,9 +93,17 @@ var last_update_element = new UI.Text({
 });
 wind.add(last_update_element);
 
+var curr_time_element = new UI.Text({
+  color: TEXT_COLOR,
+  position: new Vector2(0, 111),
+  size: new Vector2(100, 20),
+  text: "..."
+});
+wind.add(curr_time_element);
+
 // Scan hourly forecasts for the one most recent in history
 function find_closest_forecast(curr_time, forecasts) {
-  return _(forecasts).filter(function(f) {return f.time <= Math.floor(Date.now() / 1000);}).head();
+  return _(forecasts).filter(function(f) {return f.time <= Math.floor(Date.now() / 1000);}).last();
 }
 
 // Get forecast from forecast.io
@@ -117,10 +130,14 @@ function update_temperature() {
     var closest = find_closest_forecast(Math.floor(Date.now() / 1000), data.hourly.data);
     temperature_element.text(Math.round(closest.temperature) + " F");
     
-    var d = new Date();
+    var d = new Date(closest.time * 1000);
+    console.log("Closest matching date: " + d.toString());
     // The slicing is to enable zero-padding the numbers to 2 digits
-    // TODO: This doesn't get set correctly when reading a cached forecast
-    // last_update_element.text(("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2));
+    // TODO: "time last refreshed" doesn't get set correctly when reading a cached forecast
+    last_update_element.text(("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2));
+    
+    var d2 = new Date();
+    curr_time_element.text(("0" + d2.getHours()).slice(-2) + ":" + ("0" + d2.getMinutes()).slice(-2));
   });
 }
 
